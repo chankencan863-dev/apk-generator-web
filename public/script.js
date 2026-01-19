@@ -338,4 +338,383 @@ function handleIconUpload(e) {
         // Update preview icon
         const previewIcon = document.getElementById('previewIcon');
         if (previewIcon) {
-            previewIcon.style.background
+            previewIcon.style.backgroundImage = `url(${iconData})`;
+            previewIcon.innerHTML = '';
+        }
+        
+        // Store for generation
+        window.iconData = iconData;
+        
+        showAlert('Icon berhasil diunggah!', 'success');
+    };
+    
+    reader.readAsDataURL(file);
+}
+
+function togglePermission(permission) {
+    const card = document.querySelector(`.permission-card[onclick*="${permission}"]`);
+    const checkbox = document.getElementById(`perm_${permission}`);
+    
+    if (selectedPermissions.has(permission)) {
+        selectedPermissions.delete(permission);
+        card.classList.remove('border-primary');
+        checkbox.checked = false;
+    } else {
+        selectedPermissions.add(permission);
+        card.classList.add('border-primary');
+        checkbox.checked = true;
+    }
+    
+    updatePreview();
+}
+
+function updateStepIndicator() {
+    const steps = document.querySelectorAll('.step');
+    const lines = document.querySelectorAll('.step-line');
+    
+    steps.forEach((step, index) => {
+        const stepNum = index + 1;
+        if (stepNum < currentStep) {
+            step.classList.add('active');
+            if (lines[index]) {
+                lines[index].classList.add('active');
+            }
+        } else if (stepNum === currentStep) {
+            step.classList.add('active');
+            if (lines[index]) {
+                lines[index].classList.add('active');
+            }
+        } else {
+            step.classList.remove('active');
+            if (lines[index]) {
+                lines[index].classList.remove('active');
+            }
+        }
+    });
+}
+
+function updatePreview() {
+    // Update app info
+    const title = document.getElementById('appTitle').value || 'Nama Aplikasi';
+    const packageName = document.getElementById('packageName').value || 'com.example.app';
+    const description = document.getElementById('appDescription').value || 'Aplikasi Android generated';
+    
+    document.getElementById('previewTitle').textContent = title;
+    document.getElementById('previewPackage').textContent = packageName;
+    document.getElementById('previewDescription').textContent = description;
+    
+    // Update source type
+    const sourceTypeBadge = document.getElementById('previewSourceType');
+    if (sourceTypeBadge) {
+        sourceTypeBadge.textContent = selectedSourceType === 'url' ? 'Website' : 'Assets';
+        sourceTypeBadge.className = selectedSourceType === 'url' ? 
+            'badge bg-primary me-2' : 'badge bg-success me-2';
+    }
+    
+    // Update URL preview
+    if (selectedSourceType === 'url') {
+        const url = document.getElementById('websiteUrl').value;
+        document.getElementById('previewUrl').textContent = url || 'https://example.com';
+    } else {
+        document.getElementById('previewUrl').textContent = `${uploadedFiles.length} file assets`;
+    }
+    
+    // Update permission count
+    const permCount = selectedPermissions.size;
+    document.getElementById('previewPermissionCount').textContent = `${permCount} Izin`;
+    
+    // Update version
+    const versionCode = document.getElementById('versionCode').value || '1';
+    const versionName = document.getElementById('versionName').value || '1.0';
+    document.getElementById('previewVersion').textContent = `v${versionName} (${versionCode})`;
+}
+
+async function generateAPK() {
+    if (!validateStep(4)) {
+        return;
+    }
+    
+    // Collect form data
+    const formData = new FormData();
+    
+    // Basic info
+    formData.append('appTitle', document.getElementById('appTitle').value);
+    formData.append('packageName', document.getElementById('packageName').value);
+    formData.append('appDescription', document.getElementById('appDescription').value);
+    
+    // Source type
+    formData.append('sourceType', selectedSourceType);
+    if (selectedSourceType === 'url') {
+        formData.append('websiteUrl', document.getElementById('websiteUrl').value);
+    } else {
+        // Add uploaded files
+        uploadedFiles.forEach(file => {
+            formData.append('assets', file);
+        });
+    }
+    
+    // Permissions
+    formData.append('permissions', JSON.stringify(Array.from(selectedPermissions)));
+    
+    // Version
+    formData.append('versionCode', document.getElementById('versionCode').value);
+    formData.append('versionName', document.getElementById('versionName').value);
+    
+    // Options
+    formData.append('enableSplash', document.getElementById('enableSplash').checked);
+    
+    // Icon
+    if (window.iconData) {
+        formData.append('iconData', window.iconData);
+    }
+    
+    // Custom permissions
+    const customPerms = document.getElementById('customPermission').value;
+    if (customPerms) {
+        const customPermsArray = customPerms.split(',').map(p => p.trim()).filter(p => p);
+        formData.append('customPermissions', JSON.stringify(customPermsArray));
+    }
+    
+    // Show progress UI
+    showGenerationProgress();
+    addLog('Memulai proses generate APK...', 'info');
+    addLog('Menyiapkan data aplikasi...', 'info');
+    
+    try {
+        // Send request to backend
+        const response = await fetch('/api/generate', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Show success logs
+            if (result.logs) {
+                result.logs.forEach(log => {
+                    if (!log.includes('ERROR')) {
+                        addLog(log, 'success');
+                    }
+                });
+            }
+            
+            addLog('✓ APK berhasil digenerate!', 'success');
+            addLog(`📁 Ukuran file: ${formatFileSize(result.fileSize)}`, 'info');
+            addLog(`⏱️ Waktu build: ${result.buildTime} detik`, 'info');
+            
+            // Show download button
+            setTimeout(() => {
+                showDownloadModal(result.downloadUrl, result.fileName);
+            }, 1500);
+            
+        } else {
+            addLog(`✗ Error: ${result.error}`, 'error');
+            if (result.logs) {
+                result.logs.forEach(log => {
+                    if (log.includes('ERROR')) {
+                        addLog(log, 'error');
+                    }
+                });
+            }
+            showAlert('Gagal generate APK: ' + result.error, 'danger');
+        }
+    } catch (error) {
+        addLog(`✗ Network error: ${error.message}`, 'error');
+        showAlert('Gagal terhubung ke server: ' + error.message, 'danger');
+    } finally {
+        // Hide progress bar after delay
+        setTimeout(() => {
+            document.getElementById('generationProgress').classList.add('d-none');
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('generateBtn').innerHTML = '<i class="fas fa-bolt me-2"></i> Generate APK';
+        }, 2000);
+    }
+}
+
+async function quickGenerate() {
+    // Quick generate with default values
+    const defaultTitle = 'My Quick App';
+    const defaultPackage = 'com.quick.app';
+    
+    document.getElementById('appTitle').value = defaultTitle;
+    document.getElementById('packageName').value = defaultPackage;
+    
+    // Use URL if provided, otherwise use default
+    const urlInput = document.getElementById('websiteUrl');
+    if (!urlInput.value) {
+        urlInput.value = 'https://example.com';
+    }
+    
+    selectedSourceType = 'url';
+    selectedPermissions = new Set(['INTERNET']);
+    
+    // Update UI
+    document.querySelectorAll('.source-option').forEach(option => {
+        if (option.dataset.type === 'url') {
+            option.classList.add('border-primary', 'shadow');
+        } else {
+            option.classList.remove('border-primary', 'shadow');
+        }
+    });
+    
+    // Skip to final step
+    currentStep = 4;
+    updateStepIndicator();
+    
+    // Show step 4
+    document.querySelectorAll('.step-content').forEach(step => {
+        step.classList.add('d-none');
+    });
+    document.getElementById('step4').classList.remove('d-none');
+    
+    updatePreview();
+    
+    // Auto-generate after 1 second
+    setTimeout(() => {
+        showAlert('Quick generate dimulai...', 'info');
+        generateAPK();
+    }, 1000);
+}
+
+function showGenerationProgress() {
+    const progressBar = document.getElementById('generationProgress');
+    const logOutput = document.getElementById('logOutput');
+    const generateBtn = document.getElementById('generateBtn');
+    
+    // Reset UI
+    progressBar.classList.remove('d-none');
+    logOutput.classList.remove('d-none');
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Generating...';
+    
+    // Clear previous logs
+    generationLogs = [];
+    logOutput.innerHTML = '';
+    
+    // Animate progress bar
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 10;
+        if (progress <= 90) {
+            const progressElement = progressBar.querySelector('.progress-bar');
+            progressElement.style.width = `${progress}%`;
+            progressElement.textContent = `${Math.round(progress)}%`;
+        }
+    }, 500);
+    
+    // Store interval for cleanup
+    window.progressInterval = progressInterval;
+}
+
+function showDownloadModal(downloadUrl, fileName) {
+    // Update download link
+    const downloadLink = document.getElementById('downloadLink');
+    downloadLink.href = downloadUrl;
+    downloadLink.download = fileName;
+    
+    // Update file info
+    document.getElementById('downloadFileName').textContent = fileName;
+    
+    // Show modal
+    const downloadModal = new bootstrap.Modal(document.getElementById('downloadModal'));
+    downloadModal.show();
+    
+    // Clear progress interval
+    if (window.progressInterval) {
+        clearInterval(window.progressInterval);
+        window.progressInterval = null;
+    }
+    
+    // Reset progress bar
+    const progressBar = document.getElementById('generationProgress');
+    const progressElement = progressBar.querySelector('.progress-bar');
+    progressElement.style.width = '100%';
+    progressElement.textContent = '100%';
+    
+    // Change to success color
+    progressBar.querySelector('.progress-bar').classList.remove('bg-primary');
+    progressBar.querySelector('.progress-bar').classList.add('bg-success');
+}
+
+function addLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const colors = {
+        info: '#339af0',
+        success: '#51cf66',
+        warning: '#ff922b',
+        error: '#ff6b6b'
+    };
+    
+    const color = colors[type] || colors.info;
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '▶';
+    
+    const logEntry = `<div style="color: ${color}; font-family: 'Courier New', monospace; margin-bottom: 2px;">
+        <span style="opacity: 0.7">[${timestamp}]</span> ${icon} ${message}
+    </div>`;
+    
+    const logOutput = document.getElementById('logOutput');
+    logOutput.innerHTML += logEntry;
+    logOutput.scrollTop = logOutput.scrollHeight;
+    
+    generationLogs.push({ timestamp, type, message });
+}
+
+function showAlert(message, type = 'info') {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.minWidth = '300px';
+    
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    
+    const icons = {
+        html: 'fa-code',
+        css: 'fa-css3',
+        js: 'fa-js',
+        json: 'fa-file-code',
+        png: 'fa-file-image',
+        jpg: 'fa-file-image',
+        jpeg: 'fa-file-image',
+        gif: 'fa-file-image',
+        svg: 'fa-file-image',
+        ico: 'fa-file-image',
+        mp3: 'fa-file-audio',
+        mp4: 'fa-file-video',
+        pdf: 'fa-file-pdf',
+        zip: 'fa-file-archive',
+        txt: 'fa-file-alt'
+    };
+    
+    return icons[ext] || 'fa-file';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Make functions globally available
+window.togglePermission = togglePermission;
+window.quickGenerate = quickGenerate;
