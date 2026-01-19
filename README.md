@@ -31,5 +31,5 @@ Aplikasi berbasis web untuk mengonversi website atau file HTML menjadi aplikasi 
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/username/apk-generator-web.git
+git clone https://github.com/chankencan863-dev/apk-generator-web.git
 cd apk-generator-web
