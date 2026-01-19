@@ -378,6 +378,61 @@
                                 </div>
                             </div>
                         </form>
+                        <!-- Quick Actions Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-bolt me-2 text-warning"></i>Generate Instan
+                </h5>
+                <p class="card-text">Generate APK cepat dengan konfigurasi default</p>
+                <button class="btn btn-warning" id="quickGenerateBtn">
+                    <i class="fas fa-bolt me-2"></i>Quick Generate
+                </button>
+                <small class="text-muted ms-2">Hanya butuh URL website</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-server me-2"></i>Status Sistem
+                </h5>
+                <div id="systemStatus" class="mb-3">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Memeriksa sistem...
+                </div>
+                <button class="btn btn-outline-info btn-sm" onclick="checkSystemRequirements()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh Status
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Generations -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-history me-2"></i>Riwayat Generate
+                </h5>
+                <div id="generationHistory">
+                    <p class="text-muted">Belum ada riwayat generate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
                     </div>
                 </div>
 
